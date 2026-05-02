@@ -79,6 +79,7 @@
 
         async function getStats(sensorId) {
             const now = Date.now();
+            const fifteenMinAgo = now (900 * 1000);
             const oneHourAgo = now - (3600 * 1000);
             const twentyFourHoursAgo = now - (24 * 3600 * 1000);
 
@@ -99,11 +100,21 @@
             }
 
             return {
-                min1h: temps1h.length ? Math.min(...temps1h).toFixed(1) : "--",
                 max1h: temps1h.length ? Math.max(...temps1h).toFixed(1) : "--",
-                min24h: temps24h.length ? Math.min(...temps24h).toFixed(1) : "--",
                 max24h: temps24h.length ? Math.max(...temps24h).toFixed(1) : "--"
             };
+/*
+            function changeBackground(color) {
+                let elements = document.getElementsByClassName("card-header")
+
+                for (let i = 0; i < elements.length; i++) {
+                    elements.item(i).style.background = color
+                }
+            }
+
+            if (fifteenMinAgo > now) {
+                getElementsByClassName("card-header").style.ba
+            } */
         }
     </script>
 </body>
