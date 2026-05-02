@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tapas Plaza Temperatures</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body { background-color: #226c74; color: white; text-align: center; font-family: monospace; margin: 0; padding: 0 20px 20px 20px; }
+        h1 { padding: 20px 0; font-size: 2.5em; border-bottom: #1b555c 1px solid; margin-bottom: 20px; }
+        #container { display: flex; flex-direction: column; align-items: center; gap: 15px; }
+        
+        .sensor-card { background: #226c74; padding: 5px; width: 100%; max-width: 600px; border-radius: 5px; border-bottom: 1px solid #1b555c; }
+        .card-header { display: flex; justify-content: space-between; align-items: center; }
+        .label { text-transform: uppercase; font-weight: bold; font-size: 1.2em; }
+        .temp-main { font-size: 2em; font-weight: bold; color: #ffce54; }
+        
+        .stats-grid { display: grid; grid-template-columns: 1fr; font-size: 0.9em; }
+        /*.stat-box { }*/
+
+        .timestamp { font-size: 0.75em; opacity: 0.7; margin-top: 15px; text-align: right;}
+    </style>
+</head>
+<body>
+    <h1>Tapas Plaza</h1>
+
+    <div id="container">Connecting to cloud...</div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyBKFBpyPhsc0oXRVAA-imTf5nnxxqjFNqk",
+            databaseURL: "https://tapasplaza-3d4de-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "tapasplaza-3d4de",
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        // Use .on('value') to keep data live
+        db.ref('sensors').on('value', async (snapshot) => {
+            const sensors = snapshot.val();
+            const container = document.getElementById('container');
+            if (!sensors) return;
+
+            if (container.innerHTML === 'Connecting to cloud...') container.innerHTML = '';
+
+            for (let id in sensors) {
+                const sensorData = sensors[id];
+                const lastTime = sensorData.last_updated ? new Date(sensorData.last_updated).toLocaleString() : "---";
+                const currentTemp = sensorData.current !== undefined ? sensorData.current.toFixed(1) : "--";
+                
+                // Find or create card to prevent flickering
+                let card = document.getElementById(`card-${id}`);
+                if (!card) {
+                    card = document.createElement('div');
+                    card.id = `card-${id}`;
+                    card.className = 'sensor-card';
+                    container.appendChild(card);
+                }
+
+                // Fetch high/low stats
+                const stats = await getStats(id);
+
+                card.innerHTML = `
+                    <div class="card-header">
+                        <div class="label">${id.replace('_', ' ')}</div>
+                        <div class="stats-grid">
+                            <div class="stat-box">Max 1h: ${stats.max1h}°</div>
+                            <div class="stat-box">Max 24h: ${stats.max24h}°</div>
+                        </div>
+                        <div class="temp-main">${currentTemp}°C</div>
+                    </div>
+                    <div class="timestamp">Last update: ${lastTime}</div>
+                `;
+            }
+        });
+
+        async function getStats(sensorId) {
+            const now = Date.now();
+            const oneHourAgo = now - (3600 * 1000);
+            const twentyFourHoursAgo = now - (24 * 3600 * 1000);
+
+            // Fetch logs from the last 24h
+            const logSnap = await db.ref(`logs/${sensorId}`)
+                                    .orderByChild('timestamp')
+                                    .startAt(twentyFourHoursAgo)
+                                    .once('value');
+            const logs = logSnap.val();
+
+            let temps1h = [], temps24h = [];
+
+            for (let key in logs) {
+                const t = logs[key].temp;
+                const time = logs[key].timestamp;
+                if (time >= oneHourAgo) temps1h.push(t);
+                temps24h.push(t);
+            }
+
+            return {
+                min1h: temps1h.length ? Math.min(...temps1h).toFixed(1) : "--",
+                max1h: temps1h.length ? Math.max(...temps1h).toFixed(1) : "--",
+                min24h: temps24h.length ? Math.min(...temps24h).toFixed(1) : "--",
+                max24h: temps24h.length ? Math.max(...temps24h).toFixed(1) : "--"
+            };
+        }
+    </script>
+</body>
+</html>
