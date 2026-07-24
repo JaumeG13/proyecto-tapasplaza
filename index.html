@@ -12,12 +12,17 @@
         h1 { padding: 20px 0; margin: 0 0 20px 0; font-size: 2.5em; border-bottom: #1b555c 1px solid; }
         #container { display: flex; flex-direction: column; align-items: center; gap: 15px; }
         
-        .sensor-card { background: #226c74; padding: 5px; width: 100%; max-width: 600px; border-radius: 5px; border-bottom: 1px solid #1b555c; }
+        .sensor-card { background: #226c74; padding: 15px; width: 100%; max-width: 600px; border-radius: 5px; border-bottom: 1px solid #1b555c; transition: background-color 0.4s ease; }
+        
+        /* 🔴 RED STYLING WHEN SENSOR IS STALE (>15 MIN) */
+        .sensor-card.offline { background: #a93226 !important; border-bottom: 1px solid #7b241c; }
+        .sensor-card.offline .temp-main { color: #ffffff !important; }
+
         .card-header { display: flex; justify-content: space-between; align-items: center; }
         .label { text-transform: uppercase; font-weight: bold; font-size: 1.2em; text-align: left; }
         .temp-main { font-size: 2em; font-weight: bold; color: #ffce54; }
 
-        .timestamp { font-size: 0.75em; opacity: 0.7; margin-top: 15px; text-align: right; }
+        .timestamp { font-size: 0.75em; opacity: 0.85; margin-top: 15px; text-align: right; }
     </style>
 </head>
 <body>
@@ -46,19 +51,25 @@
             "sensor_0000BF": "Ambient bar"
         };
 
-        // Use .on('value') to keep data live
-        db.ref('sensors').on('value', (snapshot) => {
-            const sensors = snapshot.val();
-            const container = document.getElementById('container');
-            if (!sensors) return;
+        let cachedSensors = null;
 
+        function renderSensors() {
+            if (!cachedSensors) return;
+            const container = document.getElementById('container');
             if (container.innerHTML === 'Connecting to cloud...') container.innerHTML = '';
 
-            for (let id in sensors) {
-                const sensorData = sensors[id];
-                const lastTime = sensorData.last_updated ? new Date(sensorData.last_updated).toLocaleString() : "---";
+            const now = Date.now();
+            const fifteenMinutesMs = 15 * 60 * 1000;
+
+            for (let id in cachedSensors) {
+                const sensorData = cachedSensors[id];
+                const lastUpdatedMs = sensorData.last_updated || 0;
+                const lastTime = lastUpdatedMs ? new Date(lastUpdatedMs).toLocaleString() : "---";
                 const currentTemp = sensorData.current !== undefined ? sensorData.current.toFixed(1) : "--";
                 
+                // Determine if the sensor hasn't updated for more than 15 minutes
+                const isOffline = (now - lastUpdatedMs) > fifteenMinutesMs;
+
                 // Determine the descriptive display name
                 const displayName = sensorNames[id] || id.replace('_', ' ');
 
@@ -67,19 +78,31 @@
                 if (!card) {
                     card = document.createElement('div');
                     card.id = `card-${id}`;
-                    card.className = 'sensor-card';
                     container.appendChild(card);
                 }
 
+                // Apply offline class if outdated
+                card.className = isOffline ? 'sensor-card offline' : 'sensor-card';
+
                 card.innerHTML = `
                     <div class="card-header">
-                        <div class="label">${displayName}</div>
+                        <div class="label">${displayName} ${isOffline ? '⚠️ (OFFLINE)' : ''}</div>
                         <div class="temp-main">${currentTemp}°C</div>
                     </div>
                     <div class="timestamp">Last update: ${lastTime}</div>
                 `;
             }
+        }
+
+        // Live Firebase Listener
+        db.ref('sensors').on('value', (snapshot) => {
+            cachedSensors = snapshot.val();
+            renderSensors();
         });
+
+        // Periodic Check (Every 30s): Ensures cards turn red automatically 
+        // even if no new incoming data triggers the Firebase listener
+        setInterval(renderSensors, 30000);
     </script>
 </body>
 </html>
