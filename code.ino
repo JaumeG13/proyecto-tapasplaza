@@ -140,6 +140,21 @@ void checkAlerts(String id, float currentTemp) {
   }
 }
 
+void updateZoneLastSeen(String id) {
+  for (int i = 0; i < totalZones; i++) {
+    if (zones[i].sensorId == id) {
+      zones[i].lastSeenMillis = millis();
+      
+      // If the sensor was previously flagged as offline, clear the alert latch
+      if (zones[i].offlineAlertActive) {
+        zones[i].offlineAlertActive = false;
+        Serial.printf(" -> %s came back online!\n", zones[i].friendlyName.c_str());
+      }
+      break;
+    }
+  }
+}
+
 void setup() {
   Serial.begin(115200);
 
@@ -202,6 +217,8 @@ void loop() {
 
         if (tempC != DEVICE_DISCONNECTED_C) {
           Serial.printf("ID: %s | Temp: %.2f°C\n", dynamicSensorID.c_str(), tempC);
+
+          updateZoneLastSeen(dynamicSensorID);
 
           checkAlerts(dynamicSensorID, tempC);
 
