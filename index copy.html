@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tapas Plaza Temperatures</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body { background-color: #226c74; color: white; text-align: center; font-family: monospace; margin: 0; padding: 0 20px 20px 20px; }
+        h1 { padding: 20px 0; margin: 0 0 20px 0; font-size: 2.5em; border-bottom: #1b555c 1px solid; }
+        #container { display: flex; flex-direction: column; align-items: center; gap: 15px; }
+        
+        .sensor-card { background: #226c74; padding: 5px; width: 100%; max-width: 600px; border-radius: 5px; border-bottom: 1px solid #1b555c; }
+        .card-header { display: flex; justify-content: space-between; align-items: center; }
+        .label { text-transform: uppercase; font-weight: bold; font-size: 1.2em; text-align: left; }
+        .temp-main { font-size: 2em; font-weight: bold; color: #ffce54; }
+
+        .timestamp { font-size: 0.75em; opacity: 0.7; margin-top: 15px; text-align: right; }
+    </style>
+</head>
+<body>
+    <h1>Tapas Plaza</h1>
+
+    <div id="container">Connecting to cloud...</div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyBKFBpyPhsc0oXRVAA-imTf5nnxxqjFNqk",
+            databaseURL: "https://tapasplaza-3d4de-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "tapasplaza-3d4de",
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        // --- SENSOR NAME CONFIGURATION ---
+        const sensorNames = {
+            "sensor_00000B": "Ambient dishwashers",
+            "sensor_0000B1": "White freezer",
+            "sensor_00000A": "White fridge",
+            "sensor_000083": "Kitchen pizza",
+            "sensor_00001E": "Kitchen big",
+            "sensor_0000A8": "Kitchen small",
+            "sensor_0000BF": "Ambient bar"
+        };
+
+        // Use .on('value') to keep data live
+        db.ref('sensors').on('value', (snapshot) => {
+            const sensors = snapshot.val();
+            const container = document.getElementById('container');
+            if (!sensors) return;
+
+            if (container.innerHTML === 'Connecting to cloud...') container.innerHTML = '';
+
+            for (let id in sensors) {
+                const sensorData = sensors[id];
+                const lastTime = sensorData.last_updated ? new Date(sensorData.last_updated).toLocaleString() : "---";
+                const currentTemp = sensorData.current !== undefined ? sensorData.current.toFixed(1) : "--";
+                
+                // Determine the descriptive display name
+                const displayName = sensorNames[id] || id.replace('_', ' ');
+
+                // Find or create card to prevent flickering
+                let card = document.getElementById(`card-${id}`);
+                if (!card) {
+                    card = document.createElement('div');
+                    card.id = `card-${id}`;
+                    card.className = 'sensor-card';
+                    container.appendChild(card);
+                }
+
+                card.innerHTML = `
+                    <div class="card-header">
+                        <div class="label">${displayName}</div>
+                        <div class="temp-main">${currentTemp}°C</div>
+                    </div>
+                    <div class="timestamp">Last update: ${lastTime}</div>
+                `;
+            }
+        });
+    </script>
+</body>
+</html>
