@@ -10,9 +10,9 @@
         * { box-sizing: border-box; }
         body { background-color: #226c74; color: white; text-align: center; font-family: monospace; margin: 0; padding: 0 20px 20px 20px; }
         h1 { padding: 20px 0; margin: 0 0 20px 0; font-size: 2.5em; border-bottom: #1b555c 1px solid; }
-        #container { display: flex; flex-direction: column; align-items: center; gap: 15px; }
+        #container { display: flex; flex-direction: column; align-items: center; gap: 5px; }
         
-        .sensor-card { background: #226c74; padding: 15px; width: 100%; max-width: 600px; border-radius: 5px; border-bottom: 1px solid #1b555c; transition: background-color 0.4s ease; }
+        .sensor-card { background: #226c74; padding: 10px; width: 100%; max-width: 600px; border-radius: 5px; border-bottom: 1px solid #1b555c; transition: background-color 0.4s ease; }
         
         /* 🔴 RED STYLING WHEN SENSOR IS STALE (>15 MIN) */
         .sensor-card.offline { background: #a93226 !important; border-bottom: 1px solid #7b241c; }
@@ -40,7 +40,16 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        // --- SENSOR NAME CONFIGURATION ---
+        const sensorOrder = [
+            "sensor_0000B1", // White freezer
+            "sensor_00000A", // White fridge
+            "sensor_000083", // Kitchen pizza
+            "sensor_00001E", // Kitchen big
+            "sensor_0000A8", // Kitchen small
+            "sensor_00000B", // Ambient dishwashers
+            "sensor_0000BF"  // Ambient bar
+        ];
+
         const sensorNames = {
             "sensor_00000B": "Ambient dishwashers",
             "sensor_0000B1": "White freezer",
@@ -61,24 +70,36 @@
             const now = Date.now();
             const fifteenMinutesMs = 15 * 60 * 1000;
 
-            for (let id in cachedSensors) {
+            const allKeys = Object.keys(cachedSensors);
+            
+            const sortedKeys = allKeys.sort((a, b) => {
+                let indexA = sensorOrder.indexOf(a);
+                let indexB = sensorOrder.indexOf(b);
+                
+                // If a sensor isn't in sensorOrder array, push it to the bottom
+                if (indexA === -1) indexA = 999;
+                if (indexB === -1) indexB = 999;
+                
+                return indexA - indexB;
+            });
+
+            // 👈 FIX: Use 'of sortedKeys' instead of 'in cachedSensors'
+            for (let id of sortedKeys) {
                 const sensorData = cachedSensors[id];
                 const lastUpdatedMs = sensorData.last_updated || 0;
                 const lastTime = lastUpdatedMs ? new Date(lastUpdatedMs).toLocaleString() : "---";
                 const currentTemp = sensorData.current !== undefined ? sensorData.current.toFixed(1) : "--";
-                
-                // Determine if the sensor hasn't updated for more than 15 minutes
-                const isOffline = (now - lastUpdatedMs) > fifteenMinutesMs;
 
-                // Determine the descriptive display name
+                const isOffline = (now - lastUpdatedMs) > fifteenMinutesMs;
                 const displayName = sensorNames[id] || id.replace('_', ' ');
 
-                // Find or create card to prevent flickering
                 let card = document.getElementById(`card-${id}`);
                 if (!card) {
                     card = document.createElement('div');
                     card.id = `card-${id}`;
                     container.appendChild(card);
+                } else {
+                    container.appendChild(card); // Moves existing element to match sorted position
                 }
 
                 // Apply offline class if outdated
@@ -100,9 +121,10 @@
             renderSensors();
         });
 
-        // Periodic Check (Every 30s): Ensures cards turn red automatically 
-        // even if no new incoming data triggers the Firebase listener
+        // Periodic Check (Every 30s)
         setInterval(renderSensors, 30000);
     </script>
 </body>
 </html>
+
+
